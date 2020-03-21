@@ -1,76 +1,85 @@
-
-import React from 'react';
+import React, { useContext } from "react";
+import styled from "styled-components";
 import { DeckGL } from "@deck.gl/react";
-import { StaticMap, GeolocateControl } from 'react-map-gl';
-import PLACES from '../data/data.json';
-import Pins from './Pins';
-import { SearchContext } from '../App';
-
-// COVID19 Mapbox public key
-const token = 'pk.eyJ1IjoibWFydGluYW1wcyIsImEiOiJjazd3aDNoaTQwMjNuM2ZtZTRrcm1wOHlqIn0.1c2tf5eJPHyAvC1GgO4zzg';
+import { StaticMap, GeolocateControl, NavigationControl } from "react-map-gl";
+import Pins from "./Pins";
+import { SearchContext } from "../App";
+import { MAPBOX_TOKEN } from "../constants";
+import { getFilteredPins } from "../utils/getFilteredPins";
 
 type MapProps = {
-    onClickPin: Function;
-    lockMap: boolean;
-    viewState: any;
-    setViewState: Function;
-}
+  onClickPin: Function;
+  lockMap: boolean;
+  viewState: any;
+  setViewState: (viewState: any) => any;
+};
 
-export const Map = ({ onClickPin, lockMap, viewState, setViewState }: MapProps ) => {
-    return <SearchContext.Consumer>
-        {
-            (searchFilters) => {
-                const filteredPins = (PLACES as any).filter((place: any) => {
-                    Object.keys(searchFilters).forEach(key => {
+const mapUiBottom = 40;
 
-                    });
+const Geolocation = styled.div`
+  bottom: ${mapUiBottom}px;
+  right: 20px;
+  position: absolute;
+  z-index: 1;
+`;
 
-                    if (searchFilters['is-verified'] && place['is-verified'] !== 'TRUE') {
-                        return false;
-                    }
+const Navigation = styled.div`
+  position: absolute;
+  bottom: ${mapUiBottom + 40}px;
+  right: 20px;
+`;
 
-                    if (searchFilters['is-location-collecting-specimens'] && place['is-location-collecting-specimens'] !== 'TRUE') {
-                        return false;
-                    }
+export const Map = (props: MapProps) => {
+  const { onClickPin, lockMap, viewState, setViewState } = props;
+  const searchFilters = useContext(SearchContext);
+  const filteredPins = getFilteredPins(searchFilters);
 
-                    if (searchFilters['is-location-by-appointment-only'] && place['is-location-by-appointment-only'] !== 'TRUE') {
-                        return false;
-                    }
-
-                    if (searchFilters['is-location-only-testing-patients-that-meet-criteria'] && place['is-location-only-testing-patients-that-meet-criteria'] !== 'TRUE') {
-                        return false;
-                    }
-      
-                    return true;
-                });
-
-                return <DeckGL
-                    viewState={viewState}
-                    width="100vw"
-                    height="100vh"
-                    controller={!lockMap}
-                    getCursor={() => { return 'cursor'; }}
-                    onViewStateChange={(viewState: any) => setViewState(viewState)}
-                    // @ts-ignore
-                    glOptions={{onError: console.error}}
-                >
-                    <StaticMap
-                        width="100vw"
-                        height="100vh"
-                        style={{ zIndex: 50 }}
-                        mapStyle='mapbox://styles/mapbox/streets-v11'
-                        mapboxApiAccessToken={token}
-                    >
-                        <div style={{display: 'none', top: 62, left: 15, position: 'absolute', zIndex: 1}}>
-                            <GeolocateControl
-                                positionOptions={{enableHighAccuracy: true}}
-                                trackUserLocation={true}
-                            />
-                        </div>
-                        <Pins data={filteredPins} onClick={onClickPin} onHover={() => {}} />;
-                    </StaticMap>
-                </DeckGL>
-            }
-        }
-    </SearchContext.Consumer>;
+  return (
+    <DeckGL
+      viewState={viewState}
+      width="100vw"
+      height="100vh"
+      controller={!lockMap}
+      getCursor={() => "cursor"}
+      onViewStateChange={setViewState}
+      // @ts-ignore
+      glOptions={{ onError: console.error }}
+    >
+      <StaticMap
+        width="100vw"
+        height="100vh"
+        style={{ zIndex: 50 }}
+        mapStyle="mapbox://styles/mapbox/streets-v11"
+        mapboxApiAccessToken={MAPBOX_TOKEN}
+      >
+        <Navigation>
+          <NavigationControl
+            showCompass={false}
+            captureClick
+            captureDoubleClick
+            onViewportChange={(data: any) => {
+              const { zoom } = data;
+              setViewState({
+                viewState: { ...viewState, zoom }
+              });
+            }}
+          />
+        </Navigation>
+        <Geolocation>
+          <GeolocateControl
+            label="Use my location"
+            positionOptions={{ enableHighAccuracy: true }}
+            showUserLocation
+            onGeolocate={(data: any) => {
+              const { latitude, longitude } = data.coords;
+              setViewState({
+                viewState: { ...viewState, latitude, longitude }
+              });
+            }}
+          />
+        </Geolocation>
+        <Pins data={filteredPins} onClick={onClickPin} onHover={() => {}} />;
+      </StaticMap>
+    </DeckGL>
+  );
 };
